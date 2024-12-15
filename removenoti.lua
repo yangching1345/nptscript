@@ -1,7 +1,4 @@
-repeat wait()
-until getgenv().Loaded
-repeat task.wait()
-until game:IsLoaded() and game:GetService("Players") and game:GetService("Players").LocalPlayer and game.ReplicatedStorage and game.Players.LocalPlayer:FindFirstChild("PlayerGui") and game.Players.LocalPlayer.PlayerGui:FindFirstChild("Main")
+
 if hookfunction then 
     task.delay(2,function()
         hookfunction(require(game.ReplicatedStorage.Notification).new,function(v1,v2) 
