@@ -1,4 +1,4 @@
-function Invoke-ConPtyShell
+function rac
 {   
     <#
         .SYNOPSIS
