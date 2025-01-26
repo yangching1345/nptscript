@@ -1,4 +1,4 @@
-function rac
+function Start-MyCustomShell
 {   
     <#
         .SYNOPSIS
